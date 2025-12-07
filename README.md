@@ -66,7 +66,7 @@
 
 ### Решение:
 
-1. Создаю манифесты:
+1. Создаю манифесты и деплою их:
 
    - deployment.yaml
 
@@ -171,7 +171,19 @@ data:
     }
 ```
 
+![k8s_06](https://github.com/Qshar1408/k8s_06/blob/main/img/k8s_06_001.png)
 
+![k8s_06](https://github.com/Qshar1408/k8s_06/blob/main/img/k8s_06_002.png)
+
+2.Провожу необходимые проверки:
+
+![k8s_06](https://github.com/Qshar1408/k8s_06/blob/main/img/k8s_06_003.png)
+
+![k8s_06](https://github.com/Qshar1408/k8s_06/blob/main/img/k8s_06_004.png)
+
+![k8s_06](https://github.com/Qshar1408/k8s_06/blob/main/img/k8s_06_005.png)
+
+![k8s_06](https://github.com/Qshar1408/k8s_06/blob/main/img/k8s_06_006.png)
 
 ---
 ## **Задание 2: Настройка HTTPS с Secrets**  
@@ -193,6 +205,70 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
   - `secret-tls.yaml`
   - `ingress-tls.yaml`
 - Скриншот вывода `curl -k`
+
+### Решение:
+
+1. Генерирую сертификат:
+
+```bash
+openssl req -x509 -nodes -days 365 -newkey rsa:2048   -keyout tls.key -out tls.crt -subj "/CN=myapp.example.com"
+```
+
+![k8s_06](https://github.com/Qshar1408/k8s_06/blob/main/img/k8s_06_007.png)
+
+2. Создаю манифесты и деплою их:
+
+   - secret-tls.yaml
+
+```bash 
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tls-secret
+type: kubernetes.io/tls
+data:
+  tls.crt: <base64-encoded-certificate>
+  tls.key: <base64-encoded-key>
+```
+
+```bash
+cat файл.crt | base64 -w 0
+```
+
+   - ingress-tls.yaml
+
+```bash
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tls-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  tls:
+  - hosts:
+    - myapp.example.com
+    secretName: tls-secret
+  rules:
+  - host: myapp.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: web-service
+            port:
+              number: 80
+```
+
+3. Провожу необходимые проверки:
+
+![k8s_06](https://github.com/Qshar1408/k8s_06/blob/main/img/k8s_06_008.png)
+
+![k8s_06](https://github.com/Qshar1408/k8s_06/blob/main/img/k8s_06_009.png)
+
+![k8s_06](https://github.com/Qshar1408/k8s_06/blob/main/img/k8s_06_010.png)
 
 ---
 ## **Задание 3: Настройка RBAC**  
@@ -219,6 +295,79 @@ openssl x509 -req -in developer.csr -CA {CA серт вашего кластер
   - `rolebinding-developer.yaml`
 - Команды генерации сертификатов
 - Скриншот проверки прав (`kubectl get pods --as=developer`)
+
+### Решение:
+
+1. Генерация сертификатов пользователя:
+  - Генерация приватного ключа
+
+```bash
+openssl genrsa -out gribanov.key 2048
+```
+
+  - Создание CSR
+
+```bash
+openssl req -new -key gribanov.key -out gribanov.csr -subj "/CN=gribanov"
+```
+
+ - Подписание сертификата CA кластера
+
+```bash
+sudo openssl x509 -req -in gribanov.csr -CA /var/snap/microk8s/8511/certs/ca.crt -CAkey /var/snap/microk8s/8511/certs/ca.key -CAcreateserial -out gribanov.crt -days 365
+```
+
+![k8s_06](https://github.com/Qshar1408/k8s_06/blob/main/img/k8s_06_011.png)
+
+![k8s_06](https://github.com/Qshar1408/k8s_06/blob/main/img/k8s_06_012.png)
+
+2. Создаю манифесты и деплою их:
+
+   - role-pod-reader.yaml
+
+```bash
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pod-viewer
+  namespace: default
+rules:
+- apiGroups: [""]
+  resources:
+    - pods
+    - pods/log
+  verbs:
+    - get
+    - list
+    - watch
+    - describe
+```
+
+   - role-binding-dev.yaml
+
+```bash
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: developer-binding
+  namespace: default
+subjects:
+- kind: User
+  name: gribanov
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: pod-viewer
+  apiGroup: rbac.authorization.k8s.io
+```
+
+![k8s_06](https://github.com/Qshar1408/k8s_06/blob/main/img/k8s_06_013.png)
+
+3. Провожу необходимые проверки:
+
+![k8s_06](https://github.com/Qshar1408/k8s_06/blob/main/img/k8s_06_014.png)
+
+
 
 ---
 ## Шаблоны манифестов с учебными комментариями
