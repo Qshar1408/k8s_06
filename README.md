@@ -63,6 +63,116 @@
   - `configmap-web.yaml`
 - Скриншот вывода `curl` или браузера
 
+
+### Решение:
+
+1. Создаю манифесты:
+
+   - deployment.yaml
+
+```bash
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web-app
+  template:
+    metadata:
+      labels:
+        app: web-app
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d
+        - name: web-content
+          mountPath: /usr/share/nginx/html
+      - name: multitool
+        image: wbitt/network-multitool:latest
+        ports:
+        - containerPort: 80
+        command: ["sh", "-c", "sleep infinity"]
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: nginx-config
+      - name: web-content
+        configMap:
+          name: web-content
+```
+
+   - service.yaml
+
+```bash
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-service
+spec:
+  selector:
+    app: web-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: ClusterIP
+```
+
+   - config-map-web.yaml
+
+```bash
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-content
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Страница из ConfigMap</title>
+    </head>
+    <body>
+      <h1>Привет от Kubernetes!</h1>
+      <p>Это страница, настроенная через ConfigMap</p>
+    </body>
+    </html>
+```
+   - config-map-nginx.yaml
+
+```bash
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+data:
+  default.conf: |
+    server {
+        listen       80;
+        server_name  localhost;
+
+        location / {
+            root   /usr/share/nginx/html;
+            index  index.html index.htm;
+        }
+
+        error_page   500 502 503 504  /50x.html;
+        location = /50x.html {
+            root   /usr/share/nginx/html;
+        }
+    }
+```
+
+
+
 ---
 ## **Задание 2: Настройка HTTPS с Secrets**  
 ### **Задача**  
